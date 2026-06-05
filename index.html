@@ -214,22 +214,18 @@
   .cal-event-title{font-size:14px;line-height:1.3;}
   .cal-event-cal{font-size:10px;color:var(--text3);margin-top:2px;}
 
-  /* MONTHLY CALENDAR */
+  /* 4-WEEK CALENDAR VIEW */
   .month-nav{display:flex;align-items:center;justify-content:space-between;padding:4px 0 10px;}
   .month-nav-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:6px 16px;cursor:pointer;font-size:16px;}
-  .month-label{font-size:16px;font-weight:700;}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .month-label{font-size:13px;font-weight:700;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:start;}
   .cal-day-header{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:3px 0 6px;text-transform:uppercase;}
-  .cal-day-cell{min-height:60px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 4px;cursor:pointer;transition:background 0.15s;overflow:hidden;}
-  .cal-day-cell:active{background:var(--surface2);}
-  .cal-day-cell.other-month{opacity:0.3;}
-  .cal-day-cell.today{border-color:var(--accent);background:rgba(124,111,205,.08);}
-  .cal-day-cell.selected{border-color:var(--yellow);background:rgba(224,168,58,.08);}
-  .cal-day-num{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:2px;}
-  .cal-day-cell.today .cal-day-num{color:var(--accent);font-weight:800;}
-  .cal-event-dot{font-size:9px;line-height:1.4;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(66,133,244,.18);border-radius:3px;padding:1px 3px;margin-bottom:1px;}
-  .cal-day-expanded{background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:13px;margin-top:8px;}
-  .cal-day-expanded-title{font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);}
+  .cal4-cell{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 3px;}
+  .cal4-cell.today{border-color:var(--accent);background:rgba(124,111,205,.08);}
+  .cal4-cell.cal4-past{opacity:0.4;}
+  .cal4-daynum{font-size:11px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:3px;}
+  .cal4-cell.today .cal4-daynum{color:var(--accent);font-weight:800;}
+  .cal4-pill{display:block;background:rgba(66,133,244,.15);border-left:2px solid #4285f4;border-radius:2px;padding:2px 3px;font-size:10px;line-height:1.35;color:var(--text);word-break:break-word;margin-bottom:2px;}
 
   /* PRINT */
   @media print {
@@ -1381,52 +1377,43 @@ function selectCalDay(dateStr){
 
 function renderCalendarTab(){
   const now=new Date();
-  const month=new Date(now.getFullYear(),now.getMonth()+calMonthOffset,1);
-  const year=month.getFullYear();
-  const mon=month.getMonth();
   const todayStr=localDateStr(now);
 
-  // Month label
-  document.getElementById('calMonthLabel').textContent=
-    month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  // Find Monday of current week, then apply 4-week offset
+  const base=new Date(now);
+  base.setHours(0,0,0,0);
+  const dow=base.getDay();
+  base.setDate(base.getDate()-(dow===0?6:dow-1)); // back to Monday
+  base.setDate(base.getDate()+calMonthOffset*28);  // 4-week pages
 
-  // Day headers
+  // 28 days = 4 rows × 7 cols
+  const cells=[];
+  for(let i=0;i<28;i++){
+    const d=new Date(base);
+    d.setDate(base.getDate()+i);
+    cells.push({date:d,dateStr:localDateStr(d)});
+  }
+
+  // Date range label
+  const endDate=cells[27].date;
+  document.getElementById('calMonthLabel').textContent=
+    base.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    endDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  // Day headers Mon–Sun
   document.getElementById('calDayHeaders').innerHTML=
-    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
     .map(d=>`<div class="cal-day-header">${d}</div>`).join('');
 
-  // Build grid cells
-  const firstDOW=new Date(year,mon,1).getDay();
-  const daysInMonth=new Date(year,mon+1,0).getDate();
-  const daysInPrevMonth=new Date(year,mon,0).getDate();
-  const prevMon=mon===0?11:mon-1;
-  const prevYear=mon===0?year-1:year;
-  const nextMon=mon===11?0:mon+1;
-  const nextYear=mon===11?year+1:year;
-
-  let cells=[];
-  for(let i=firstDOW-1;i>=0;i--){
-    const d=daysInPrevMonth-i;
-    cells.push({day:d,dateStr:[prevYear,String(prevMon+1).padStart(2,'0'),String(d).padStart(2,'0')].join('-'),thisMonth:false});
-  }
-  for(let d=1;d<=daysInMonth;d++){
-    cells.push({day:d,dateStr:[year,String(mon+1).padStart(2,'0'),String(d).padStart(2,'0')].join('-'),thisMonth:true});
-  }
-  let nd=1;
-  while(cells.length%7!==0){
-    cells.push({day:nd,dateStr:[nextYear,String(nextMon+1).padStart(2,'0'),String(nd).padStart(2,'0')].join('-'),thisMonth:false});
-    nd++;
-  }
-
+  // Grid cells — full event title pills, no truncation
   document.getElementById('calMonthGrid').innerHTML=cells.map(cell=>{
     const evts=getEventsForDate(cell.dateStr);
     const isToday=cell.dateStr===todayStr;
-    const isSel=cell.dateStr===calSelectedDay;
-    const dots=evts.slice(0,3).map(_=>`<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#4285f4;margin-right:2px;flex-shrink:0"></span>`).join('');
-    const more=evts.length>3?`<span style="font-size:8px;color:var(--text3)">+${evts.length-3}</span>`:'';
-    return`<div class="cal-day-cell${cell.thisMonth?'':' other-month'}${isToday?' today':''}${isSel?' selected':''}" onclick="selectCalDay('${cell.dateStr}')">
-      <div class="cal-day-num">${cell.day}</div>
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:1px;margin-top:2px">${dots}${more}</div>
+    const isPast=cell.dateStr<todayStr;
+    const pills=evts.map(e=>`<span class="cal4-pill">${esc(e.summary)}</span>`).join('');
+    return`<div class="cal4-cell${isToday?' today':''}${isPast?' cal4-past':''}">
+      <div class="cal4-daynum">${cell.date.getDate()}</div>
+      ${pills}
     </div>`;
   }).join('');
 
@@ -1448,32 +1435,9 @@ function renderCalendarTab(){
     </div>`;
   }
 
-  // Auto-select today if viewing current month and nothing selected
-  if(!calSelectedDay){
-    const viewingCurrentMonth=(calMonthOffset===0);
-    if(viewingCurrentMonth) calSelectedDay=todayStr;
-  }
-
-  // Re-highlight selected cell after auto-select
-  document.querySelectorAll('.cal-day-cell').forEach(el=>{
-    const ds=el.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
-    if(ds) el.classList.toggle('selected', ds===calSelectedDay);
-  });
-
-  // Expanded day panel
+  // Clear unused panel
   const expEl=document.getElementById('calDayExpanded');
-  if(calSelectedDay){
-    const expEvts=getEventsForDate(calSelectedDay);
-    const d=new Date(calSelectedDay+'T12:00:00');
-    const isToday=calSelectedDay===todayStr;
-    const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-    expEl.innerHTML=`<div class="cal-day-expanded" style="margin-top:10px">
-      <div class="cal-day-expanded-title" style="color:${isToday?'var(--yellow)':'var(--text)'}">${label}${isToday?' · Today':''}</div>
-      ${expEvts.length ? expEvts.map(calEventHTML).join('') : '<div class="empty" style="padding:8px 0;font-size:13px">No events</div>'}
-    </div>`;
-  } else {
-    expEl.innerHTML=`<div style="text-align:center;padding:16px 0;font-size:12px;color:var(--text3)">Tap a day to see events</div>`;
-  }
+  if(expEl)expEl.innerHTML='';
 }
 
 async function fetchCalendarEvents(token){
