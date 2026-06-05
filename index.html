@@ -350,7 +350,6 @@
   <div class="cal-grid" id="calDayHeaders"></div>
   <div class="cal-grid" id="calMonthGrid" style="margin-top:2px"></div>
   <div id="calDayExpanded"></div>
-  <div id="calEventsList" style="margin-top:14px"></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -1449,41 +1448,32 @@ function renderCalendarTab(){
     </div>`;
   }
 
-  // Expanded day panel (tap to highlight)
+  // Auto-select today if viewing current month and nothing selected
+  if(!calSelectedDay){
+    const viewingCurrentMonth=(calMonthOffset===0);
+    if(viewingCurrentMonth) calSelectedDay=todayStr;
+  }
+
+  // Re-highlight selected cell after auto-select
+  document.querySelectorAll('.cal-day-cell').forEach(el=>{
+    const ds=el.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+    if(ds) el.classList.toggle('selected', ds===calSelectedDay);
+  });
+
+  // Expanded day panel
   const expEl=document.getElementById('calDayExpanded');
   if(calSelectedDay){
     const expEvts=getEventsForDate(calSelectedDay);
     const d=new Date(calSelectedDay+'T12:00:00');
+    const isToday=calSelectedDay===todayStr;
     const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-    expEl.innerHTML=`<div class="cal-day-expanded">
-      <div class="cal-day-expanded-title">${label}</div>
-      ${expEvts.length?expEvts.map(calEventHTML).join(''):'<div class="empty" style="padding:10px 0">No events</div>'}
+    expEl.innerHTML=`<div class="cal-day-expanded" style="margin-top:10px">
+      <div class="cal-day-expanded-title" style="color:${isToday?'var(--yellow)':'var(--text)'}">${label}${isToday?' · Today':''}</div>
+      ${expEvts.length ? expEvts.map(calEventHTML).join('') : '<div class="empty" style="padding:8px 0;font-size:13px">No events</div>'}
     </div>`;
   } else {
-    expEl.innerHTML='';
+    expEl.innerHTML=`<div style="text-align:center;padding:16px 0;font-size:12px;color:var(--text3)">Tap a day to see events</div>`;
   }
-
-  // Full events list — all events this month, full titles
-  const listEl=document.getElementById('calEventsList');
-  if(!listEl)return;
-  const monthPrefix=`${year}-${String(mon+1).padStart(2,'0')}`;
-  const monthEvts=(window.__calEvents||[]).filter(e=>e.dateStr&&e.dateStr.startsWith(monthPrefix));
-  if(!monthEvts.length){listEl.innerHTML='<div class="empty" style="padding:16px 0">No events this month</div>';return;}
-  // Group by date
-  const byDate={};
-  for(const e of monthEvts){if(!byDate[e.dateStr])byDate[e.dateStr]=[];byDate[e.dateStr].push(e);}
-  let listHtml='';
-  for(const ds of Object.keys(byDate).sort()){
-    const isToday=ds===todayStr;
-    const isSel=ds===calSelectedDay;
-    const dayD=new Date(ds+'T12:00:00');
-    const dayLabel=dayD.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
-    listHtml+=`<div style="margin-bottom:14px${isSel?';border-left:3px solid var(--yellow);padding-left:10px':''}">
-      <div style="font-size:12px;font-weight:700;color:${isToday?'var(--yellow)':isSel?'var(--yellow)':'var(--text2)'};margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">${dayLabel}${isToday?' · Today':''}</div>
-      ${byDate[ds].map(calEventHTML).join('')}
-    </div>`;
-  }
-  listEl.innerHTML=listHtml;
 }
 
 async function fetchCalendarEvents(token){
