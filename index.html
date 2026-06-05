@@ -201,6 +201,36 @@
   .log-tag-x:hover{color:var(--red);}
   .log-tag-week{font-size:10px;color:var(--text3);margin-left:2px;}
 
+  /* ALFRED VOICE BUTTON */
+  .alfred-btn{background:rgba(124,111,205,.15);border:1px solid rgba(124,111,205,.3);border-radius:50%;width:36px;height:36px;color:var(--accent);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
+  .alfred-btn:active{background:var(--accent);color:white;}
+  .alfred-btn.listening{background:var(--red);border-color:var(--red);color:white;animation:alfred-pulse 1s infinite;}
+  @keyframes alfred-pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,92,106,.5)}50%{box-shadow:0 0 0 10px rgba(224,92,106,0)}}
+
+  /* CALENDAR EVENTS IN TABS */
+  .cal-section-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#4285f4;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+  .cal-event-item{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.25);border-left:3px solid #4285f4;border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:4px;display:flex;gap:8px;align-items:flex-start;}
+  .cal-event-time{font-size:11px;color:var(--text2);white-space:nowrap;min-width:52px;flex-shrink:0;margin-top:2px;}
+  .cal-event-title{font-size:14px;line-height:1.3;}
+  .cal-event-cal{font-size:10px;color:var(--text3);margin-top:2px;}
+
+  /* MONTHLY CALENDAR */
+  .month-nav{display:flex;align-items:center;justify-content:space-between;padding:4px 0 10px;}
+  .month-nav-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:6px 16px;cursor:pointer;font-size:16px;}
+  .month-label{font-size:16px;font-weight:700;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-day-header{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:3px 0 6px;text-transform:uppercase;}
+  .cal-day-cell{min-height:60px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 4px;cursor:pointer;transition:background 0.15s;overflow:hidden;}
+  .cal-day-cell:active{background:var(--surface2);}
+  .cal-day-cell.other-month{opacity:0.3;}
+  .cal-day-cell.today{border-color:var(--accent);background:rgba(124,111,205,.08);}
+  .cal-day-cell.selected{border-color:var(--yellow);background:rgba(224,168,58,.08);}
+  .cal-day-num{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:2px;}
+  .cal-day-cell.today .cal-day-num{color:var(--accent);font-weight:800;}
+  .cal-event-dot{font-size:9px;line-height:1.4;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(66,133,244,.18);border-radius:3px;padding:1px 3px;margin-bottom:1px;}
+  .cal-day-expanded{background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:13px;margin-top:8px;}
+  .cal-day-expanded-title{font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);}
+
   /* PRINT */
   @media print {
     body{background:white;color:black;max-width:100%;}
@@ -221,8 +251,20 @@
       <div class="week-label" id="weekLabel">–</div>
       <div class="sync-dot" id="syncDot"></div>
     </div>
-    <div class="score-badge" id="headerScore" onclick="showTab('week')">–%</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="alfred-btn" id="alfredBtn" onclick="activateAlfred()" title="Hey Alfred">🎤</button>
+      <div class="score-badge" id="headerScore" onclick="showTab('week')">–%</div>
+    </div>
   </div>
+</div>
+
+<!-- ALFRED OVERLAY -->
+<div id="alfredOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,16,.96);z-index:400;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;">
+  <div style="font-size:52px" id="alfredIcon">🎤</div>
+  <div style="font-size:19px;font-weight:700;color:var(--text)">Alfred is listening…</div>
+  <div id="alfredTranscript" style="font-size:15px;color:var(--text2);min-height:44px;max-width:320px;line-height:1.5;font-style:italic"></div>
+  <div id="alfredResponse" style="display:none;font-size:14px;color:var(--accent);max-width:320px;line-height:1.5;font-weight:500"></div>
+  <button class="btn-s" onclick="dismissAlfred()" style="margin-top:8px;min-width:100px">Cancel</button>
 </div>
 
 <!-- ═══════ THIS WEEK TAB ═══════ -->
@@ -240,6 +282,7 @@
   <div class="done-toggle" id="wk-all-done-tog" onclick="toggleDone('wk-all')"></div>
   <div id="wk-all-done-wrap" style="display:none"><div class="task-list" id="wk-all-done-list"></div></div>
 
+  <div id="weekCalSection" style="display:none;margin-top:4px"></div>
   <div class="divider"></div>
 
   <!-- Habits -->
@@ -256,6 +299,7 @@
     <span class="sh-title">Today <span class="badge" id="today-ct">0</span></span>
     <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="openAdd('today')">+ Add</button>
   </div>
+  <div id="today-events" style="display:none;margin-bottom:10px"></div>
   <div class="qaf"><input type="text" id="qa-today" placeholder="Quick add…" onkeydown="if(event.key==='Enter')quickAdd('today')"><button class="btn-add" onclick="quickAdd('today')">+</button></div>
   <div class="task-list" id="today-list"></div>
   <div class="done-toggle" id="today-done-tog" onclick="toggleDone('today')"></div>
@@ -295,12 +339,26 @@
   <div id="reviewTaskSection" style="margin-top:4px"></div>
 </div>
 
+<!-- ═══════ CALENDAR TAB ═══════ -->
+<div id="tab-calendar" class="tab">
+  <div id="calSyncBar"></div>
+  <div class="month-nav">
+    <button class="month-nav-btn" onclick="changeCalMonth(-1)">‹</button>
+    <span class="month-label" id="calMonthLabel">–</span>
+    <button class="month-nav-btn" onclick="changeCalMonth(1)">›</button>
+  </div>
+  <div class="cal-grid" id="calDayHeaders"></div>
+  <div class="cal-grid" id="calMonthGrid" style="margin-top:2px"></div>
+  <div id="calDayExpanded"></div>
+</div>
+
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
   <button class="bnb active" onclick="showTab('today')" id="nav-today"><span class="bnb-icon">☑️</span><span class="bnb-label">Today</span></button>
   <button class="bnb" onclick="showTab('week')" id="nav-week"><span class="bnb-icon">📋</span><span class="bnb-label">Week</span></button>
   <button class="bnb" onclick="showTab('backlog')" id="nav-backlog"><span class="bnb-icon">📥</span><span class="bnb-label">Backlog</span></button>
   <button class="bnb" onclick="showTab('review')" id="nav-review"><span class="bnb-icon">📊</span><span class="bnb-label">Review</span></button>
+  <button class="bnb" onclick="showTab('calendar')" id="nav-calendar"><span class="bnb-icon">📅</span><span class="bnb-label">Calendar</span></button>
 </div>
 
 <!-- TASK DETAIL / EDIT MODAL -->
@@ -621,6 +679,7 @@ function showTab(tab){
   document.getElementById('nav-'+tab).classList.add('active');
   if(tab==='week'){renderTasks();renderWeekHabits();}
   else if(tab==='review')renderReview();
+  else if(tab==='calendar')renderCalendarTab();
   else renderTasks();
   // sync sort button state
   const sb=document.getElementById('sortDayBtn');
@@ -805,6 +864,8 @@ function renderTasks(){
   renderListEl(document.getElementById('backlog-list'), backlog, {moveLabel:'Week',moveTo:'week'});
   document.getElementById('backlog-ct').textContent=backlog.length;
   updateWeekStats();
+  renderTodayEvents();
+  renderWeekEvents();
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1089,6 +1150,356 @@ function updateHeaderScore(){
 }
 
 // ──────────────────────────────────────────────────────────
+// ALFRED VOICE ASSISTANT
+// ──────────────────────────────────────────────────────────
+const ALFRED_VOICE = {
+  week:[
+    "Very good, sir. I've added that to your weekly list.",
+    "Certainly, sir. Consider it on the weekly list.",
+    "As you wish, sir. I've noted it for the week.",
+    "Right away, sir. It's on your week.",
+  ],
+  today:[
+    "Very good, sir. I've added that to today's tasks.",
+    "Of course. You'll find it in today's list, sir.",
+    "Certainly, sir. Added to today.",
+  ],
+  backlog:[
+    "Very good, sir. I've filed that away in the backlog.",
+    "Noted, sir. It's in the backlog for when you're ready.",
+    "I've placed it in the backlog, sir. Whenever you're prepared.",
+  ],
+  error:[
+    "I'm afraid I didn't quite catch that, sir. Perhaps try again?",
+    "My apologies, sir. Could you be a touch more specific?",
+    "Forgive me, sir. I couldn't make that out.",
+  ],
+  notask:[
+    "I'm afraid I couldn't identify a task, sir. Say something like: 'add workout to my weekly list'.",
+    "Pardon, sir — could you tell me what to add and where?",
+  ],
+};
+
+function alfredSpeak(text){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  const utt=new SpeechSynthesisUtterance(text);
+  const voices=speechSynthesis.getVoices();
+  const voice=voices.find(v=>v.lang==='en-GB'&&v.name.includes('Male'))||
+               voices.find(v=>v.lang==='en-GB')||
+               voices.find(v=>v.lang.startsWith('en-'))||null;
+  if(voice)utt.voice=voice;
+  utt.rate=0.82;
+  utt.pitch=0.82;
+  speechSynthesis.speak(utt);
+}
+
+function alfredRand(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+function parseAlfredCommand(text){
+  // Determine target list
+  let list='week';
+  if(/\b(today|today's)\b/i.test(text))list='today';
+  else if(/\bbacklog\b/i.test(text))list='backlog';
+
+  // Strip wake/command words and list references from task name
+  let task=text
+    .replace(/^(hey\s+alfred[,.]?\s*)?(please\s*)?(can\s+you\s*)?(add|create|put|log|schedule|remind\s+me\s+to|remind\s+me)\s+/i,'')
+    .replace(/\s+to\s+(my\s+)?(weekly\s+)?(to.?do\s+)?(list|tasks?)?\s*\.?\s*$/i,'')
+    .replace(/\s+to\s+(today'?s?\s*)?(weekly|this week|the week|the weekly|today|backlog)(\s+(list|tasks?))?\s*\.?\s*$/i,'')
+    .replace(/\s+on\s+(my\s+)?(weekly|this week|today'?s?|backlog)(\s+(list|tasks?))?\s*\.?\s*$/i,'')
+    .trim();
+
+  if(task)task=task.charAt(0).toUpperCase()+task.slice(1);
+  return{task,list};
+}
+
+let _alfredRec=null;
+let _alfredTimer=null;
+
+function activateAlfred(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    alert("Voice recognition isn't supported in this browser, sir. Try Chrome or Safari on iOS.");
+    return;
+  }
+  const overlay=document.getElementById('alfredOverlay');
+  overlay.style.display='flex';
+  document.getElementById('alfredTranscript').textContent='';
+  document.getElementById('alfredResponse').style.display='none';
+  document.getElementById('alfredIcon').textContent='🎤';
+  document.getElementById('alfredBtn').classList.add('listening');
+
+  _alfredRec=new SR();
+  _alfredRec.lang='en-US';
+  _alfredRec.continuous=false;
+  _alfredRec.interimResults=true;
+
+  _alfredRec.onresult=e=>{
+    const transcript=Array.from(e.results).map(r=>r[0].transcript).join('');
+    document.getElementById('alfredTranscript').textContent='"'+transcript+'"';
+    if(e.results[e.results.length-1].isFinal)processAlfredCommand(transcript);
+  };
+  _alfredRec.onerror=e=>{
+    if(e.error==='aborted')return;
+    const msg=alfredRand(ALFRED_VOICE.error);
+    _showAlfredResp(msg,'⚠️');alfredSpeak(msg);
+    _alfredTimer=setTimeout(dismissAlfred,3500);
+  };
+  _alfredRec.onend=()=>{document.getElementById('alfredBtn').classList.remove('listening');};
+  _alfredRec.start();
+}
+
+function processAlfredCommand(text){
+  if(!text.trim()){dismissAlfred();return;}
+  const{task,list}=parseAlfredCommand(text);
+  if(!task||task.length<2){
+    const msg=alfredRand(ALFRED_VOICE.notask);
+    _showAlfredResp(msg,'🤔');alfredSpeak(msg);
+    _alfredTimer=setTimeout(dismissAlfred,4000);
+    return;
+  }
+  APP.tasks.push({id:uid(),title:task,notes:'',list,dayTag:null,completed:false,completedAt:null,dueDate:null,createdAt:new Date().toISOString()});
+  save(APP);renderTasks();updateHeaderScore();
+  const msg=alfredRand(ALFRED_VOICE[list]);
+  _showAlfredResp('✓  "'+task+'" → '+list,'✅');
+  alfredSpeak(msg);
+  _alfredTimer=setTimeout(dismissAlfred,3200);
+}
+
+function _showAlfredResp(text,icon){
+  if(icon)document.getElementById('alfredIcon').textContent=icon;
+  const el=document.getElementById('alfredResponse');
+  el.textContent=text;el.style.display='block';
+}
+
+function dismissAlfred(){
+  clearTimeout(_alfredTimer);
+  if(_alfredRec){try{_alfredRec.stop();}catch(e){}  _alfredRec=null;}
+  document.getElementById('alfredOverlay').style.display='none';
+  document.getElementById('alfredBtn').classList.remove('listening');
+}
+
+// Handle URL-param approach for iOS Shortcuts integration
+function checkAlfredURLParams(){
+  try{
+    const p=new URLSearchParams(location.search);
+    if(p.get('alfred')==='add'){
+      const task=p.get('task');
+      const list=['today','week','backlog'].includes(p.get('list'))?p.get('list'):'week';
+      if(task&&task.trim()){
+        const title=decodeURIComponent(task).trim();
+        if(!APP.tasks.some(t=>t.title===title&&!t.completed)){
+          APP.tasks.push({id:uid(),title,notes:'',list,dayTag:null,completed:false,completedAt:null,dueDate:null,createdAt:new Date().toISOString()});
+          save(APP);
+        }
+      }
+      history.replaceState({},'',location.pathname);
+    }
+  }catch(e){}
+}
+
+// ──────────────────────────────────────────────────────────
+// GOOGLE CALENDAR INTEGRATION
+// ──────────────────────────────────────────────────────────
+window.__calEvents = window.__calEvents || [];
+window.__gcalToken = null;
+window.__calFetchTime = null;
+let calMonthOffset = 0;
+let calSelectedDay = null;
+
+function localDateStr(d){
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+}
+function getEventsForDate(dateStr){
+  return (window.__calEvents||[]).filter(e=>e.dateStr===dateStr);
+}
+function fmtEventTime(evt){
+  if(evt.allDay)return'All day';
+  return evt.startDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function calEventHTML(evt){
+  return`<div class="cal-event-item">
+    <div class="cal-event-time">${fmtEventTime(evt)}</div>
+    <div style="flex:1;min-width:0">
+      <div class="cal-event-title">${esc(evt.summary)}</div>
+      <div class="cal-event-cal">${esc(evt.calendarName)}</div>
+    </div>
+  </div>`;
+}
+
+function renderTodayEvents(){
+  const el=document.getElementById('today-events');
+  if(!el)return;
+  const todayStr=localDateStr(new Date());
+  const evts=getEventsForDate(todayStr);
+  if(!evts.length){el.style.display='none';return;}
+  el.style.display='';
+  el.innerHTML=`<div class="cal-section-header">📅 Today&#39;s Events</div>`+evts.map(calEventHTML).join('');
+}
+
+function renderWeekEvents(){
+  const el=document.getElementById('weekCalSection');
+  if(!el)return;
+  const wk=getWeekKey();
+  const days=getDaysOfWeek(wk);
+  const todayStr=localDateStr(new Date());
+  let html='';
+  for(const day of days){
+    const dateStr=localDateStr(day);
+    const evts=getEventsForDate(dateStr);
+    if(!evts.length)continue;
+    const isToday=dateStr===todayStr;
+    const dayLabel=day.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    html+=`<div style="margin-bottom:10px">
+      <div class="cal-section-header" style="${isToday?'color:var(--yellow)':''}">📅 ${dayLabel}${isToday?' · Today':''}</div>
+      ${evts.map(calEventHTML).join('')}
+    </div>`;
+  }
+  if(!html){el.style.display='none';return;}
+  el.style.display='';
+  el.innerHTML=`<div class="sh" style="margin-top:0;margin-bottom:6px">
+    <span class="sh-title" style="color:#4285f4">Calendar Events</span>
+  </div>`+html;
+}
+
+function changeCalMonth(delta){calMonthOffset+=delta;renderCalendarTab();}
+function selectCalDay(dateStr){
+  calSelectedDay=calSelectedDay===dateStr?null:dateStr;
+  renderCalendarTab();
+}
+
+function renderCalendarTab(){
+  const now=new Date();
+  const month=new Date(now.getFullYear(),now.getMonth()+calMonthOffset,1);
+  const year=month.getFullYear();
+  const mon=month.getMonth();
+  const todayStr=localDateStr(now);
+
+  // Month label
+  document.getElementById('calMonthLabel').textContent=
+    month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  // Day headers
+  document.getElementById('calDayHeaders').innerHTML=
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    .map(d=>`<div class="cal-day-header">${d}</div>`).join('');
+
+  // Build grid cells
+  const firstDOW=new Date(year,mon,1).getDay();
+  const daysInMonth=new Date(year,mon+1,0).getDate();
+  const daysInPrevMonth=new Date(year,mon,0).getDate();
+  const prevMon=mon===0?11:mon-1;
+  const prevYear=mon===0?year-1:year;
+  const nextMon=mon===11?0:mon+1;
+  const nextYear=mon===11?year+1:year;
+
+  let cells=[];
+  for(let i=firstDOW-1;i>=0;i--){
+    const d=daysInPrevMonth-i;
+    cells.push({day:d,dateStr:[prevYear,String(prevMon+1).padStart(2,'0'),String(d).padStart(2,'0')].join('-'),thisMonth:false});
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    cells.push({day:d,dateStr:[year,String(mon+1).padStart(2,'0'),String(d).padStart(2,'0')].join('-'),thisMonth:true});
+  }
+  let nd=1;
+  while(cells.length%7!==0){
+    cells.push({day:nd,dateStr:[nextYear,String(nextMon+1).padStart(2,'0'),String(nd).padStart(2,'0')].join('-'),thisMonth:false});
+    nd++;
+  }
+
+  document.getElementById('calMonthGrid').innerHTML=cells.map(cell=>{
+    const evts=getEventsForDate(cell.dateStr);
+    const isToday=cell.dateStr===todayStr;
+    const isSel=cell.dateStr===calSelectedDay;
+    const dots=evts.slice(0,2).map(e=>`<div class="cal-event-dot">${esc(e.summary)}</div>`).join('');
+    const more=evts.length>2?`<div style="font-size:9px;color:var(--text3);padding:1px 3px">+${evts.length-2}</div>`:'';
+    return`<div class="cal-day-cell${cell.thisMonth?'':' other-month'}${isToday?' today':''}${isSel?' selected':''}" onclick="selectCalDay('${cell.dateStr}')">
+      <div class="cal-day-num">${cell.day}</div>
+      ${dots}${more}
+    </div>`;
+  }).join('');
+
+  // Sync bar
+  const hasCal=(window.__calEvents||[]).length>0;
+  const syncEl=document.getElementById('calSyncBar');
+  if(hasCal){
+    const mins=window.__calFetchTime?Math.round((Date.now()-window.__calFetchTime)/60000):null;
+    syncEl.innerHTML=`<div style="font-size:11px;color:var(--text3);display:flex;justify-content:space-between;align-items:center;padding-bottom:10px">
+      <span>📅 ${window.__calEvents.length} events${mins!==null?' · synced '+mins+'m ago':''}</span>
+      <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="connectCalendar()">↻ Refresh</button>
+    </div>`;
+  } else {
+    syncEl.innerHTML=`<div style="text-align:center;padding:30px 0 20px">
+      <div style="font-size:36px;margin-bottom:10px">📅</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:6px">Connect Google Calendar</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px">See your events alongside your tasks</div>
+      <button class="btn-p" onclick="connectCalendar()" style="width:100%;max-width:260px">Connect Calendar</button>
+    </div>`;
+  }
+
+  // Expanded day panel
+  const expEl=document.getElementById('calDayExpanded');
+  if(!calSelectedDay){expEl.innerHTML='';return;}
+  const expEvts=getEventsForDate(calSelectedDay);
+  const d=new Date(calSelectedDay+'T12:00:00');
+  const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  expEl.innerHTML=`<div class="cal-day-expanded">
+    <div class="cal-day-expanded-title">${label}</div>
+    ${expEvts.length?expEvts.map(calEventHTML).join(''):'<div class="empty" style="padding:10px 0">No events</div>'}
+  </div>`;
+}
+
+async function fetchCalendarEvents(token){
+  if(!token)return;
+  try{
+    const now=new Date();
+    const timeMin=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString();
+    const timeMax=new Date(now.getFullYear(),now.getMonth()+3,1).toISOString();
+
+    const listResp=await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList',
+      {headers:{Authorization:'Bearer '+token}});
+    if(!listResp.ok)return;
+    const calList=await listResp.json();
+
+    const allEvents=[];
+    for(const cal of (calList.items||[])){
+      if(cal.accessRole==='freeBusyReader')continue;
+      try{
+        const url=`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=250`;
+        const evtResp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+        if(!evtResp.ok)continue;
+        const evtData=await evtResp.json();
+        for(const evt of (evtData.items||[])){
+          if(!evt.start||evt.status==='cancelled')continue;
+          const allDay=!evt.start.dateTime;
+          const rawDate=evt.start.dateTime||evt.start.date||'';
+          allEvents.push({
+            id:evt.id,
+            calendarId:cal.id,
+            calendarName:cal.summary||'Calendar',
+            calendarColor:cal.backgroundColor||'#4285f4',
+            summary:evt.summary||'(No title)',
+            allDay,
+            dateStr:rawDate.split('T')[0],
+            startDate:new Date(evt.start.dateTime||(evt.start.date+'T00:00:00')),
+            endDate:new Date(evt.end.dateTime||(evt.end.date+'T00:00:00')),
+          });
+        }
+      }catch(e){/* skip calendar */}
+    }
+    allEvents.sort((a,b)=>a.startDate-b.startDate);
+    window.__calEvents=allEvents;
+    window.__calFetchTime=Date.now();
+
+    renderTodayEvents();
+    renderWeekEvents();
+    if(document.getElementById('tab-calendar')?.classList.contains('active'))
+      renderCalendarTab();
+  }catch(e){console.warn('Calendar fetch error:',e);}
+}
+
+// ──────────────────────────────────────────────────────────
 // SEED DATA
 // ──────────────────────────────────────────────────────────
 function seedData(){
@@ -1182,6 +1593,7 @@ function runAppInit(){
   APP=load(); // reload in case Firebase wrote fresher data to localStorage
   handleDayChange();
   processSeedTasks();
+  checkAlfredURLParams();
   seedData();
   showTab('today');
   updateHeaderScore();
@@ -1231,6 +1643,8 @@ setTimeout(()=>{if(!window.__appStarted){window.__appStarted=true;runAppInit();}
   if(location.protocol==='file:'){window.__appStarted=true;runAppInit();return;}
   const FB_CFG='wt_fb_cfg',FB_SKIP='wt_fb_skip';
   const $=id=>document.getElementById(id);
+  // Hardcoded config — no per-device setup needed
+  const EMBEDDED_CFG={apiKey:"AIzaSyARKxXjH-Jmh_lL_o4tf677Kb5-MgHt4nc",authDomain:"alfred-personal-tracker.firebaseapp.com",databaseURL:"https://alfred-personal-tracker-default-rtdb.firebaseio.com",projectId:"alfred-personal-tracker",storageBucket:"alfred-personal-tracker.firebasestorage.app",messagingSenderId:"1042405140444",appId:"1:1042405140444:web:5a6829767c880cefc81119"};
   function syncDot(s){
     const el=$('syncDot');if(!el)return;
     el.className='sync-dot'+(s?' '+s:'');
@@ -1283,18 +1697,36 @@ setTimeout(()=>{if(!window.__appStarted){window.__appStarted=true;runAppInit();}
   window.fbSignIn=async function(){
     try{
       const provider=new firebase.auth.GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
       const result=await firebase.auth().signInWithPopup(provider);
-      if(result.user)await syncAndStart(result.user,firebase.database());
+      if(result.user){
+        window.__gcalToken=result.credential?.accessToken||null;
+        if(window.__gcalToken)fetchCalendarEvents(window.__gcalToken);
+        await syncAndStart(result.user,firebase.database());
+      }
     }catch(e){
       if(e.code!=='auth/popup-closed-by-user')alert('Sign-in failed: '+e.message);
+    }
+  };
+
+  window.connectCalendar=async function(){
+    try{
+      const provider=new firebase.auth.GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+      const result=await firebase.auth().signInWithPopup(provider);
+      if(result.credential?.accessToken){
+        window.__gcalToken=result.credential.accessToken;
+        await fetchCalendarEvents(window.__gcalToken);
+      }
+    }catch(e){
+      if(e.code!=='auth/popup-closed-by-user')console.warn('Calendar connect failed:',e);
     }
   };
   window.resetFbConfig=function(){localStorage.removeItem(FB_CFG);localStorage.removeItem(FB_SKIP);location.reload();};
 
   if(localStorage.getItem(FB_SKIP)){window.__appStarted=true;runAppInit();return;}
 
-  let cfg;try{cfg=JSON.parse(localStorage.getItem(FB_CFG)||'null');}catch{}
-  if(!cfg){$('fbSetupOverlay').style.display='flex';return;}
+  const cfg=EMBEDDED_CFG;
 
   try{
     firebase.initializeApp(cfg);

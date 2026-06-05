@@ -1,6 +1,6 @@
 # Alfred Personal Tracker — Project Context
 
-**Last updated:** June 4, 2026 · 4:02 PM ET  
+**Last updated:** June 4, 2026 · 7:32 PM ET  
 
 **Live app:** https://seanbrennan-atl.github.io/Alfred-personal-tracker/  
 **GitHub repo:** https://github.com/seanbrennan-atl/Alfred-personal-tracker  
@@ -136,6 +136,49 @@ APP = {
 ---
 
 ## Session Log
+
+### 2026-06-04 — Session 3
+**Changes made:**
+
+1. **Apple Calendar ↔ Google Calendar sync** — Enabled Calendars toggle on `seanbrennan.atl@gmail.com` in System Settings → Internet Accounts. Google Calendar API was already enabled in the "Alfred personal tracker" GCP project.
+
+2. **Google Calendar integration in Alfred** — Read-only pull from Google Calendar API. Auth piggybacks on existing Firebase Google sign-in (adds `calendar.readonly` scope). Events fetched for -1 to +3 months from today, stored in `window.__calEvents`.
+   - **Today tab** — Today's Google Calendar events appear above the task list in a blue section, with time + title + calendar name.
+   - **Week tab** — This week's events appear grouped by day (above habits), visually distinct from tasks.
+   - **Calendar tab (5th tab)** — New monthly calendar view. Tap any day to expand and see events. Prev/Next month nav. "Refresh" button to re-sync. "Connect Calendar" prompt shown if not yet connected.
+   - **connectCalendar()** — Button on Calendar tab triggers a Google popup (silent if scope already granted) to get a fresh access token and fetch events.
+   - **URL param support** — Opening `?alfred=add&task=...&list=week` auto-adds a task (for iOS Shortcut integration).
+
+3. **Alfred Voice Assistant** — 🎤 mic button in the header. Tap → speaks → Alfred parses the command and adds the task.
+   - Natural language parsing: "Add workout to my weekly list" → task="Workout", list='week'
+   - Responds via `speechSynthesis` in a Michael Caine / Alfred Pennyworth voice (en-GB voice, rate 0.82, pitch 0.82)
+   - Sample responses: "Very good, sir. I've added that to your weekly list.", "Certainly, sir.", etc.
+   - Supports today/week/backlog routing from spoken phrase
+   - iOS Shortcut integration: create a Shortcut named "Alfred" → Ask for Input → Open URL `https://seanbrennan-atl.github.io/Alfred-personal-tracker/?alfred=add&task=[input]&list=week`
+
+**New tab order (bottom nav):** Today · Week · Backlog · Review · Calendar
+
+**Key notes:**
+- Calendar token is short-lived (1 hr). Returning users need to tap "Refresh" on the Calendar tab to re-authenticate and fetch fresh events.
+- Voice recognition requires HTTPS (works on GitHub Pages URL, not `file://`)
+- `window.__calEvents` is in-memory only — not persisted to localStorage or Firebase (fetched fresh each session)
+
+### 2026-06-04 — Session 2
+**Changes made:**
+1. **Firebase config hardcoded** — embedded directly in `index.html` so no per-device setup is needed. Any device opening the GitHub Pages URL will connect to Firebase automatically.
+2. **file:// fix** — added protocol check at top of Firebase init; skips Firebase entirely when opened as a local file (prevents auth error on desktop local opens).
+3. **Git + auto-push fully set up** — installed Xcode CLT (git), granted Terminal Full Disk Access, initialized the git repo, connected remote to `https://github.com/seanbrennan-atl/Alfred-personal-tracker.git`, force-pushed, and got LaunchAgent running (PID confirmed, exit 0).
+
+**How sync works now:**
+- **Data sync** (tasks/habits): Firebase Realtime Database. Both phone and desktop must use the GitHub Pages URL and sign in with the same Google account. Sign-in uses `signInWithPopup` — works on `https://`, not on `file://`.
+- **Code sync** (app updates): Claude edits local `index.html` → LaunchAgent auto-pushes to GitHub every 60s → GitHub Pages serves updated code → both devices get it on next refresh.
+
+**Important notes:**
+- Always use **https://seanbrennan-atl.github.io/Alfred-personal-tracker/** on desktop — never open the local file for data entry
+- Firebase config is now hardcoded in the Firebase sync script (no longer stored only in localStorage)
+- `wt_fb_skip` in localStorage still works as an escape hatch to bypass Firebase
+- LaunchAgent plist is at `~/Library/LaunchAgents/com.alfred.autopush.plist` — if it stops after a restart, run: `launchctl load ~/Library/LaunchAgents/com.alfred.autopush.plist`
+- `diagnose.sh` left in project folder — useful for future debugging
 
 ### 2026-06-04 — Session 1
 **Changes made:**
