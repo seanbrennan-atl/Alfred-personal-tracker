@@ -350,6 +350,7 @@
   <div class="cal-grid" id="calDayHeaders"></div>
   <div class="cal-grid" id="calMonthGrid" style="margin-top:2px"></div>
   <div id="calDayExpanded"></div>
+  <div id="calEventsList" style="margin-top:14px"></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -1349,10 +1350,15 @@ function renderWeekEvents(){
   const wk=getWeekKey();
   const days=getDaysOfWeek(wk);
   const todayStr=localDateStr(new Date());
+  const now=new Date();
   let html='';
   for(const day of days){
     const dateStr=localDateStr(day);
-    const evts=getEventsForDate(dateStr);
+    // Skip days that have fully passed
+    if(dateStr<todayStr)continue;
+    let evts=getEventsForDate(dateStr);
+    // For today: hide events that have already ended
+    if(dateStr===todayStr) evts=evts.filter(e=>e.allDay||e.endDate>=now);
     if(!evts.length)continue;
     const isToday=dateStr===todayStr;
     const dayLabel=day.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -1417,11 +1423,11 @@ function renderCalendarTab(){
     const evts=getEventsForDate(cell.dateStr);
     const isToday=cell.dateStr===todayStr;
     const isSel=cell.dateStr===calSelectedDay;
-    const dots=evts.slice(0,2).map(e=>`<div class="cal-event-dot">${esc(e.summary)}</div>`).join('');
-    const more=evts.length>2?`<div style="font-size:9px;color:var(--text3);padding:1px 3px">+${evts.length-2}</div>`:'';
+    const dots=evts.slice(0,3).map(_=>`<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#4285f4;margin-right:2px;flex-shrink:0"></span>`).join('');
+    const more=evts.length>3?`<span style="font-size:8px;color:var(--text3)">+${evts.length-3}</span>`:'';
     return`<div class="cal-day-cell${cell.thisMonth?'':' other-month'}${isToday?' today':''}${isSel?' selected':''}" onclick="selectCalDay('${cell.dateStr}')">
       <div class="cal-day-num">${cell.day}</div>
-      ${dots}${more}
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:1px;margin-top:2px">${dots}${more}</div>
     </div>`;
   }).join('');
 
@@ -1443,16 +1449,41 @@ function renderCalendarTab(){
     </div>`;
   }
 
-  // Expanded day panel
+  // Expanded day panel (tap to highlight)
   const expEl=document.getElementById('calDayExpanded');
-  if(!calSelectedDay){expEl.innerHTML='';return;}
-  const expEvts=getEventsForDate(calSelectedDay);
-  const d=new Date(calSelectedDay+'T12:00:00');
-  const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  expEl.innerHTML=`<div class="cal-day-expanded">
-    <div class="cal-day-expanded-title">${label}</div>
-    ${expEvts.length?expEvts.map(calEventHTML).join(''):'<div class="empty" style="padding:10px 0">No events</div>'}
-  </div>`;
+  if(calSelectedDay){
+    const expEvts=getEventsForDate(calSelectedDay);
+    const d=new Date(calSelectedDay+'T12:00:00');
+    const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+    expEl.innerHTML=`<div class="cal-day-expanded">
+      <div class="cal-day-expanded-title">${label}</div>
+      ${expEvts.length?expEvts.map(calEventHTML).join(''):'<div class="empty" style="padding:10px 0">No events</div>'}
+    </div>`;
+  } else {
+    expEl.innerHTML='';
+  }
+
+  // Full events list — all events this month, full titles
+  const listEl=document.getElementById('calEventsList');
+  if(!listEl)return;
+  const monthPrefix=`${year}-${String(mon+1).padStart(2,'0')}`;
+  const monthEvts=(window.__calEvents||[]).filter(e=>e.dateStr&&e.dateStr.startsWith(monthPrefix));
+  if(!monthEvts.length){listEl.innerHTML='<div class="empty" style="padding:16px 0">No events this month</div>';return;}
+  // Group by date
+  const byDate={};
+  for(const e of monthEvts){if(!byDate[e.dateStr])byDate[e.dateStr]=[];byDate[e.dateStr].push(e);}
+  let listHtml='';
+  for(const ds of Object.keys(byDate).sort()){
+    const isToday=ds===todayStr;
+    const isSel=ds===calSelectedDay;
+    const dayD=new Date(ds+'T12:00:00');
+    const dayLabel=dayD.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    listHtml+=`<div style="margin-bottom:14px${isSel?';border-left:3px solid var(--yellow);padding-left:10px':''}">
+      <div style="font-size:12px;font-weight:700;color:${isToday?'var(--yellow)':isSel?'var(--yellow)':'var(--text2)'};margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">${dayLabel}${isToday?' · Today':''}</div>
+      ${byDate[ds].map(calEventHTML).join('')}
+    </div>`;
+  }
+  listEl.innerHTML=listHtml;
 }
 
 async function fetchCalendarEvents(token){
