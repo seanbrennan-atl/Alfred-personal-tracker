@@ -1305,6 +1305,11 @@ function checkAlfredURLParams(){
 window.__calEvents = window.__calEvents || [];
 window.__gcalToken = null;
 window.__calFetchTime = null;
+
+// Token persistence — reuse cached token for up to 55 min
+const GCAL_TOKEN_KEY = 'wt_gcal_token';
+function _saveCalToken(token){ try{ localStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({token, ts:Date.now()})); }catch(e){} }
+function _loadCalToken(){ try{ const d=JSON.parse(localStorage.getItem(GCAL_TOKEN_KEY)||'null'); if(!d)return null; if(Date.now()-d.ts > 55*60*1000){ localStorage.removeItem(GCAL_TOKEN_KEY); return null; } return d.token; }catch(e){ return null; } }
 let calMonthOffset = 0;
 let calSelectedDay = null;
 
@@ -1597,6 +1602,9 @@ function runAppInit(){
   seedData();
   showTab('today');
   updateHeaderScore();
+  // Auto-load calendar from cached token if still valid
+  const cachedToken=_loadCalToken();
+  if(cachedToken){ window.__gcalToken=cachedToken; fetchCalendarEvents(cachedToken); }
 }
 // Firebase sync script (below) calls runAppInit() after sync.
 // Safety fallback: if Firebase SDK doesn't load, start after 2.5s.
@@ -1701,7 +1709,7 @@ setTimeout(()=>{if(!window.__appStarted){window.__appStarted=true;runAppInit();}
       const result=await firebase.auth().signInWithPopup(provider);
       if(result.user){
         window.__gcalToken=result.credential?.accessToken||null;
-        if(window.__gcalToken)fetchCalendarEvents(window.__gcalToken);
+        if(window.__gcalToken){ _saveCalToken(window.__gcalToken); fetchCalendarEvents(window.__gcalToken); }
         await syncAndStart(result.user,firebase.database());
       }
     }catch(e){
@@ -1716,6 +1724,7 @@ setTimeout(()=>{if(!window.__appStarted){window.__appStarted=true;runAppInit();}
       const result=await firebase.auth().signInWithPopup(provider);
       if(result.credential?.accessToken){
         window.__gcalToken=result.credential.accessToken;
+        _saveCalToken(window.__gcalToken);
         await fetchCalendarEvents(window.__gcalToken);
       }
     }catch(e){
