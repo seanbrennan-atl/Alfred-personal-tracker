@@ -549,6 +549,8 @@ const HABITS=[
   {id:'creative',     name:'Creative Time',  type:'numeric',goal:2,unit:'hrs',     step:0.5,scored:true},
   {id:'reading',      name:'Reading',        type:'numeric',goal:2,unit:'hrs',     step:0.5,scored:true},
   {id:'relationships',name:'Relationships',  type:'numeric',goal:1,unit:'reach-outs',step:1,scored:true},
+  {id:'socialMedia',  name:'Social Media',   type:'daily_binary',  emoji:'📱',     scored:true},
+  {id:'meditation',   name:'Meditation',     type:'daily_binary',  emoji:'🧘',     scored:true},
 ];
 function ensureHabitWeek(wk){
   if(!APP.habits[wk])APP.habits[wk]={
@@ -556,8 +558,13 @@ function ensureHabitWeek(wk){
     wakeOnTime: [null,null,null,null,null,null,null],
     sleepHours: [null,null,null,null,null,null,null],
     alcoholDrinks:null,alcoholHeavyDays:null,
-    workouts:null,creative:null,reading:null,relationships:null
+    workouts:null,creative:null,reading:null,relationships:null,
+    socialMedia:[null,null,null,null,null,null,null],
+    meditation: [null,null,null,null,null,null,null]
   };
+  // Backward-compat: add new fields to existing weeks
+  if(!APP.habits[wk].socialMedia)APP.habits[wk].socialMedia=[null,null,null,null,null,null,null];
+  if(!APP.habits[wk].meditation) APP.habits[wk].meditation= [null,null,null,null,null,null,null];
   return APP.habits[wk];
 }
 
@@ -566,6 +573,13 @@ function ensureHabitWeek(wk){
 // ──────────────────────────────────────────────────────────
 function scoreHabit(id,wk){
   const hw=APP.habits[wk];if(!hw)return null;
+  // Generic daily_binary handler
+  const hdef=HABITS.find(h=>h.id===id);
+  if(hdef?.type==='daily_binary'){
+    const arr=hw[id];
+    if(!arr||arr.every(v=>v===null))return null;
+    return Math.min(100,Math.round(arr.filter(v=>v===true).length/7*100));
+  }
   switch(id){
     case'sleep':{
       const sc=[];
@@ -618,6 +632,15 @@ function weekDayFrac(){
 function paceClass(id,hw){
   if(!hw)return'sn';
   const frac=weekDayFrac();
+  // Generic daily_binary handler
+  const hdef=HABITS.find(h=>h.id===id);
+  if(hdef?.type==='daily_binary'){
+    const arr=hw[id];
+    if(!arr||arr.every(v=>v===null))return'sn';
+    const a=arr.filter(v=>v===true).length/7;
+    if(frac<0.15&&a===0)return'sn';
+    return a>=frac?'sg':a>=frac*0.6?'so':'sp';
+  }
   switch(id){
     case'workouts':    {const a=(hw.workouts??0)/4;    if(frac<0.15&&a===0)return'sn';return a>=frac?'sg':a>=frac*0.6?'so':'sp';}
     case'creative':    {const a=(hw.creative??0)/2;    if(frac<0.15&&a===0)return'sn';return a>=frac?'sg':a>=frac*0.6?'so':'sp';}
@@ -895,6 +918,11 @@ function fmtNum(v,step){
 
 function habitActual(id,hw){
   if(!hw)return'–';
+  const hdef=HABITS.find(h=>h.id===id);
+  if(hdef?.type==='daily_binary'){
+    const arr=hw[id]||[];
+    return`${arr.filter(v=>v===true).length} / 7 days`;
+  }
   switch(id){
     case'sleep':{
       const t=hw.sleepHours.filter(v=>v!==null).reduce((a,b)=>a+b,0);
@@ -913,6 +941,11 @@ function habitActual(id,hw){
 
 function habitPct(id,hw){
   if(!hw)return 0;
+  const hdef=HABITS.find(h=>h.id===id);
+  if(hdef?.type==='daily_binary'){
+    const arr=hw[id]||[];
+    return Math.min(100,Math.round(arr.filter(v=>v===true).length/7*100));
+  }
   switch(id){
     case'sleep':{const t=hw.sleepHours.filter(v=>v!==null).reduce((a,b)=>a+b,0);return Math.min(100,Math.round(t/64*100));}
     case'alcohol':{const s=scoreHabit('alcohol',getWeekKey());return s??0;}
@@ -974,6 +1007,15 @@ function renderWeekHabits(){
             <span class="num-val">${hv}</span>
             <button class="num-btn" onclick="setNumeric('${wk}','alcoholHeavyDays',${hv+1})">+</button>
           </div></div></div>`;
+    }
+    else if(h.type==='daily_binary'){
+      detail=`<div class="sleep-day-log">${days.map((day,i)=>`
+        <div class="sdr">
+          <span class="sdn">${DAY_ABBR[i]} ${day.getDate()}</span>
+          <button class="stog${hw[h.id][i]===true?' on':hw[h.id][i]===false?' ob':''}"
+            onclick="cycleBinary('${wk}','${h.id}',${i})" title="${h.name}">${h.emoji}</button>
+        </div>`).join('')}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">Tap to toggle: grey=unlogged · green=Yes · red=No</div>`;
     }
     else if(h.type==='numeric'){
       const val=hw[h.id]??0;
@@ -1280,20 +1322,42 @@ function dismissAlfred(){
 function checkAlfredURLParams(){
   try{
     const p=new URLSearchParams(location.search);
-    if(p.get('alfred')==='add'){
-      const task=p.get('task');
-      const list=['today','week','backlog'].includes(p.get('list'))?p.get('list'):'week';
-      if(task&&task.trim()){
-        const title=decodeURIComponent(task).trim();
-        if(!APP.tasks.some(t=>t.title===title&&!t.completed)){
-          APP.tasks.push({id:uid(),title,notes:'',list,dayTag:null,completed:false,completedAt:null,dueDate:null,createdAt:new Date().toISOString()});
-          save(APP);
-        }
-      }
-      history.replaceState({},'',location.pathname);
+    const mode=p.get('alfred');
+    if(!mode)return;
+    history.replaceState({},'',location.pathname);
+
+    let task='',list='week';
+
+    if(mode==='add'){
+      // Direct: ?alfred=add&task=Workout&list=week
+      const raw=p.get('task');
+      if(!raw||!raw.trim())return;
+      task=decodeURIComponent(raw).trim();
+      list=['today','week','backlog'].includes(p.get('list'))?p.get('list'):'week';
+    } else if(mode==='voice'){
+      // NLP: ?alfred=voice&text=Add workout to my weekly list
+      const raw=p.get('text');
+      if(!raw||!raw.trim())return;
+      const parsed=parseAlfredCommand(decodeURIComponent(raw).trim());
+      task=parsed.task;list=parsed.list;
     }
+
+    if(!task||task.length<2)return;
+    if(APP.tasks.some(t=>t.title===task&&!t.completed))return; // dedupe
+    APP.tasks.push({id:uid(),title:task,notes:'',list,dayTag:null,completed:false,completedAt:null,dueDate:null,createdAt:new Date().toISOString()});
+    save(APP);
+
+    // Show confirmation toast
+    const listLabel=list==='today'?'Today':list==='backlog'?'Backlog':'Week';
+    const toast=document.createElement('div');
+    toast.style.cssText='position:fixed;top:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 18px;font-size:14px;color:var(--text);z-index:500;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:300px';
+    toast.innerHTML=`<div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">ALFRED</div><div>✓ "${task}"</div><div style="font-size:11px;color:var(--text2);margin-top:3px">Added to ${listLabel}</div>`;
+    document.body.appendChild(toast);
+    setTimeout(()=>toast.remove(),3500);
   }catch(e){}
 }
+// Re-check params on every page show (handles Shortcut re-opens)
+window.addEventListener('pageshow',()=>{if(window.__appStarted)checkAlfredURLParams();});
 
 // ──────────────────────────────────────────────────────────
 // GOOGLE CALENDAR INTEGRATION
